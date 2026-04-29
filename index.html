@@ -107,6 +107,8 @@
             "Assets/soeur_paris_1763888448_3772092157017208903_539516923 1.png",
             "Assets/zhuchongyun_1770617589_3828540287371930487_33940091205 3.png",
         ];
+        const LOGO_SECTION_IMAGE_PATH = "Assets/Group 409.png";
+        const CENTER_LOGO_IMAGE_PATH = "Assets/Loem calligraphy signature.png";
 
         const CARDS_PER_SECTION = 6;
         const SECTION_COUNT = SECTION_TITLES.length;
@@ -170,6 +172,9 @@
         }
 
         const baseAssets = BASE_IMAGE_PATHS.map((path) => createImageAsset(path));
+        const logoSectionAsset = createImageAsset(LOGO_SECTION_IMAGE_PATH);
+        const centerLogoAsset = createImageAsset(CENTER_LOGO_IMAGE_PATH);
+        const logosSectionIndex = SECTION_TITLES.findIndex((title) => title.toLowerCase() === 'logos');
 
         const particles = Array.from({ length: CARDS_PER_SECTION }, (_, i) => {
             // Use midpoint sampling so first/last cards are not stuck on the poles.
@@ -205,7 +210,7 @@
             const step = 5;
             const seed = (sectionIndex * 3 + 1) % total;
 
-            return Array.from({ length: CARDS_PER_SECTION }, (_, slot) => {
+            const media = Array.from({ length: CARDS_PER_SECTION }, (_, slot) => {
                 const imageIndex = (seed + slot * step) % total;
                 return {
                     img: baseAssets[imageIndex],
@@ -214,6 +219,28 @@
                     label: String(slot + 1).padStart(2, '0'),
                 };
             });
+
+            if (sectionIndex === logosSectionIndex) {
+                for (let i = 0; i < media.length; i += 1) {
+                    media[i] = {
+                        ...media[i],
+                        flipX: false,
+                        flipY: false,
+                        fitMode: 'contain',
+                        disableBlur: true,
+                    };
+                }
+                media[0] = {
+                    ...media[0],
+                    img: logoSectionAsset,
+                    transparentBg: true,
+                    fitMode: 'contain',
+                    scale: 1.9,
+                    disableBlur: true,
+                };
+            }
+
+            return media;
         }
 
         const sectionMedia = SECTION_TITLES.map((_, sectionIndex) => createSectionMedia(sectionIndex));
@@ -222,11 +249,14 @@
             if (opacity < 0.01) return;
             ctx.save();
             ctx.globalAlpha = opacity;
-            if (blur > 0.2) ctx.filter = `blur(${blur.toFixed(2)}px)`;
+            const cardBlur = media.disableBlur ? 0 : blur;
+            if (cardBlur > 0.2) ctx.filter = `blur(${cardBlur.toFixed(2)}px)`;
             const hw = w / 2;
             const hh = h / 2;
-            ctx.fillStyle = '#d9d2c8';
-            ctx.fillRect(sx - hw, sy - hh, w, h);
+            if (!media.transparentBg) {
+                ctx.fillStyle = '#d9d2c8';
+                ctx.fillRect(sx - hw, sy - hh, w, h);
+            }
             ctx.save();
             ctx.beginPath();
             ctx.rect(sx - hw, sy - hh, w, h);
@@ -234,7 +264,9 @@
             const img = media.img;
             const loaded = img && img.complete && img.naturalWidth > 0;
             if (loaded) {
-                const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+                const s = media.fitMode === 'contain'
+                    ? Math.min(w / img.naturalWidth, h / img.naturalHeight)
+                    : Math.max(w / img.naturalWidth, h / img.naturalHeight);
                 const drawW = img.naturalWidth * s;
                 const drawH = img.naturalHeight * s;
 
@@ -246,8 +278,13 @@
                     ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
                 }
             } else {
-                ctx.fillStyle = '#c8c1b6';
+                ctx.fillStyle = media.transparentBg ? 'rgba(255,255,255,0.35)' : '#c8c1b6';
                 ctx.fillRect(sx - hw, sy - hh, w, h);
+                if (media.transparentBg) {
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.24)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(sx - hw, sy - hh, w, h);
+                }
             }
 
             const badgeMargin = Math.max(5, w * 0.035);
@@ -304,9 +341,11 @@
                 const rawSy = cy + fy * R * p.orbitY;
                 const depth = (fz + 1) / 2;
 
+                const media = sectionMedia[sectionIndex][p.slot];
+                const mediaScale = media.scale || 1;
                 const sizeF = (0.38 + depth * 0.95) * CARD_SIZE_BOOST;
-                const w = p.baseW * sizeF;
-                const h = p.baseH * sizeF;
+                const w = p.baseW * sizeF * mediaScale;
+                const h = p.baseH * sizeF * mediaScale;
                 const safeMargin = 14;
                 const sx = clamp(rawSx, safeMargin + w / 2, W - safeMargin - w / 2);
                 const sy = clamp(rawSy, safeMargin + h / 2, H - safeMargin - h / 2);
@@ -324,39 +363,27 @@
                     depth,
                     opacity: opacity * layerAlpha,
                     blur,
-                    media: sectionMedia[sectionIndex][p.slot],
+                    media,
                 };
             });
         }
 
-        function drawCenterTitle(currentIndex, nextIndex, mix) {
-            const titleCurrent = SECTION_TITLES[currentIndex];
-            const titleNext = SECTION_TITLES[nextIndex];
+        function drawCenterLogo() {
+            const img = centerLogoAsset;
+            const loaded = img && img.complete && img.naturalWidth > 0;
+            if (!loaded) return;
 
-            const size = Math.max(34, Math.min(W * 0.075, 78));
-            const font = `600 ${size}px Georgia, "Times New Roman", serif`;
+            const targetW = clamp(W * 0.46, 180, 520);
+            const targetH = clamp(H * 0.2, 72, 200);
+            const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
+            const drawW = img.naturalWidth * scale;
+            const drawH = img.naturalHeight * scale;
 
             ctx.save();
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#121212';
+            ctx.globalAlpha = 0.98;
             ctx.shadowColor = 'rgba(0,0,0,0.12)';
-            ctx.shadowBlur = 18;
-            ctx.font = font;
-
-            const outAlpha = nextIndex === currentIndex ? 1 : (1 - mix);
-            if (outAlpha > 0.01) {
-                ctx.globalAlpha = outAlpha;
-                ctx.filter = `blur(${(mix * 6).toFixed(2)}px)`;
-                ctx.fillText(titleCurrent, cx, cy);
-            }
-
-            if (nextIndex !== currentIndex && mix > 0.01) {
-                ctx.globalAlpha = mix;
-                ctx.filter = `blur(${((1 - mix) * 6).toFixed(2)}px)`;
-                ctx.fillText(titleNext, cx, cy);
-            }
-
+            ctx.shadowBlur = 10;
+            ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
             ctx.restore();
         }
 
@@ -396,7 +423,7 @@
                 .filter((card) => card.depth < CENTER_DEPTH)
                 .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
 
-            drawCenterTitle(currentIndex, nextIndex, mix);
+            drawCenterLogo();
 
             allCards
                 .filter((card) => card.depth >= CENTER_DEPTH)
