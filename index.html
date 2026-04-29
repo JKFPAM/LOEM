@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LIFE</title>
     <style>
+        @font-face {
+            font-family: "Test Martina Plantijn";
+            src: url("/fonts/TestMartinaPlantijn-Light.otf") format("opentype");
+            font-weight: 300;
+            font-style: normal;
+            font-display: swap;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -557,7 +565,7 @@
             const fontSize = clamp(W * 0.0213, 16, 38);
             const lineHeight = Math.round(fontSize * 1.1);
             const maxWidth = clamp(W * 0.72, 320, 1060);
-            ctx.font = `500 ${fontSize}px Georgia, "Times New Roman", serif`;
+            ctx.font = `300 ${fontSize}px "Test Martina Plantijn", Georgia, "Times New Roman", serif`;
             const lines = buildCenteredLines(text, maxWidth);
             const startY = cy - ((lines.length - 1) * lineHeight) / 2;
             lines.forEach((line, idx) => {
