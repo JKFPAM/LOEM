@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIFE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            background: #EDE5DA;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            display: block;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .scroll-snap {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+        }
+
+        .snap-section {
+            min-height: 100vh;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+    <div id="scrollSnap" class="scroll-snap" aria-hidden="true">
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+        <section class="snap-section"></section>
+    </div>
+    <script>
+        const SECTION_TITLES = [
+            "Creative Concept",
+            "Logos",
+            "Motif/Monogram",
+            "Colors",
+            "Typography",
+            "icons",
+            "Art Direction",
+        ];
+
+        const canvas = document.getElementById('c');
+        const scrollSnap = document.getElementById('scrollSnap');
+        const ctx = canvas.getContext('2d');
+
+        // Keep section count in sync with titles.
+        scrollSnap.innerHTML = SECTION_TITLES
+            .map((title) => `<section class="snap-section" aria-label="${title}"></section>`)
+            .join('');
+
+        let W = 0;
+        let H = 0;
+        let cx = 0;
+        let cy = 0;
+        let scrollProgress = 0;
+        let renderProgress = 0;
+        let targetSpin = 0;
+        let currentSpin = 0;
+
+        const BASE_IMAGE_PATHS = [
+            "Assets/cosstores_1764409846_3776465965115332144_392125511 1.png",
+            "Assets/image 100.png",
+            "Assets/image 160.png",
+            "Assets/image 161.png",
+            "Assets/image 162.png",
+            "Assets/image 96.png",
+            "Assets/image 97.png",
+            "Assets/louisdewynter_1700238665_3238159083012627055_226582794 2.png",
+            "Assets/original_0995e3cd9f020f9c3ddb2664d94c8ce0 3.png",
+            "Assets/original_b44b8abee530c4056f8962ba2e53b164 5.png",
+            "Assets/palet.company_1766388787_3793066521728170133_303443909 2.png",
+            "Assets/rvstapleton_1729101960_3480281946918339529_207976621 5.png",
+            "Assets/soeur_paris_1763888448_3772092157017208903_539516923 1.png",
+            "Assets/zhuchongyun_1770617589_3828540287371930487_33940091205 3.png",
+        ];
+
+        const CARDS_PER_SECTION = 6;
+        const SECTION_COUNT = SECTION_TITLES.length;
+        const TOTAL_TURNS = 5;
+        const TILT_X = 14 * Math.PI / 180;
+        const PHASE_PER_SECTION = Math.PI * 0.58;
+        const CENTER_DEPTH = 0.5;
+        const MAX_OPACITY = 0.8;
+        const MIN_CARD_VISIBILITY = 0.54;
+        const MAX_CARD_VISIBILITY = 0.98;
+        const PROGRESS_LERP_BASE = 0.86;
+        const SPIN_LERP_BASE = 0.88;
+        const WORLD_RADIUS = 0.45;
+        const HORIZONTAL_SPREAD = 1.24;
+        const CARD_SIZE_BOOST = 1.36;
+        const CORNER_BOOST_X_STRONG = 1.28;
+        const CORNER_BOOST_Y_STRONG = 1.18;
+        const CORNER_BOOST_X_SOFT = 1.14;
+        const CORNER_BOOST_Y_SOFT = 1.08;
+        const PHI = Math.PI * (3 - Math.sqrt(5));
+        const cosT = Math.cos(TILT_X);
+        const sinT = Math.sin(TILT_X);
+
+        function smoothstep(v) {
+            const t = Math.max(0, Math.min(1, v));
+            return t * t * (3 - 2 * t);
+        }
+
+        function clamp(v, min, max) {
+            return Math.max(min, Math.min(max, v));
+        }
+
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W * dpr;
+            canvas.height = H * dpr;
+            canvas.style.width = `${W}px`;
+            canvas.style.height = `${H}px`;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            cx = W / 2;
+            cy = H / 2;
+        }
+
+        function updateScrollProgress() {
+            const max = Math.max(1, scrollSnap.scrollHeight - scrollSnap.clientHeight);
+            scrollProgress = scrollSnap.scrollTop / max;
+        }
+
+        function sectionPhase(index) {
+            return index * PHASE_PER_SECTION;
+        }
+
+        function createImageAsset(path) {
+            const img = new Image();
+            img.decoding = 'async';
+            img.loading = 'eager';
+            img.src = encodeURI(path);
+            return img;
+        }
+
+        const baseAssets = BASE_IMAGE_PATHS.map((path) => createImageAsset(path));
+
+        const particles = Array.from({ length: CARDS_PER_SECTION }, (_, i) => {
+            // Use midpoint sampling so first/last cards are not stuck on the poles.
+            const y = 1 - ((i + 0.5) / CARDS_PER_SECTION) * 2;
+            const r = Math.sqrt(Math.max(0, 1 - y * y));
+            const theta = PHI * i;
+            const baseW = 122 + (i % 4) * 14;
+            const baseH = baseW * (1.25 + (i % 3) * 0.08);
+            const edgeSeed = (i * 17 + 11) % 12;
+            let orbitX = 1;
+            let orbitY = 1;
+            if (edgeSeed < 4) {
+                orbitX = CORNER_BOOST_X_STRONG;
+                orbitY = CORNER_BOOST_Y_STRONG;
+            } else if (edgeSeed < 7) {
+                orbitX = CORNER_BOOST_X_SOFT;
+                orbitY = CORNER_BOOST_Y_SOFT;
+            }
+            return {
+                x: r * Math.cos(theta),
+                y: y * 0.66,
+                z: r * Math.sin(theta),
+                baseW,
+                baseH,
+                orbitX,
+                orbitY,
+                slot: i,
+            };
+        });
+
+        function createSectionMedia(sectionIndex) {
+            const total = baseAssets.length;
+            const step = 5;
+            const seed = (sectionIndex * 3 + 1) % total;
+
+            return Array.from({ length: CARDS_PER_SECTION }, (_, slot) => {
+                const imageIndex = (seed + slot * step) % total;
+                return {
+                    img: baseAssets[imageIndex],
+                    flipX: ((slot + sectionIndex) % 3) === 0,
+                    flipY: ((slot + sectionIndex) % 5) === 0,
+                    label: String(slot + 1).padStart(2, '0'),
+                };
+            });
+        }
+
+        const sectionMedia = SECTION_TITLES.map((_, sectionIndex) => createSectionMedia(sectionIndex));
+
+        function drawCard(media, sx, sy, w, h, opacity, blur) {
+            if (opacity < 0.01) return;
+            ctx.save();
+            ctx.globalAlpha = opacity;
+            if (blur > 0.2) ctx.filter = `blur(${blur.toFixed(2)}px)`;
+            const hw = w / 2;
+            const hh = h / 2;
+            ctx.fillStyle = '#d9d2c8';
+            ctx.fillRect(sx - hw, sy - hh, w, h);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(sx - hw, sy - hh, w, h);
+            ctx.clip();
+            const img = media.img;
+            const loaded = img && img.complete && img.naturalWidth > 0;
+            if (loaded) {
+                const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+                const drawW = img.naturalWidth * s;
+                const drawH = img.naturalHeight * s;
+
+                if (media.flipX || media.flipY) {
+                    ctx.translate(sx, sy);
+                    ctx.scale(media.flipX ? -1 : 1, media.flipY ? -1 : 1);
+                    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+                } else {
+                    ctx.drawImage(img, sx - drawW / 2, sy - drawH / 2, drawW, drawH);
+                }
+            } else {
+                ctx.fillStyle = '#c8c1b6';
+                ctx.fillRect(sx - hw, sy - hh, w, h);
+            }
+
+            const badgeMargin = Math.max(5, w * 0.035);
+            const badgeHeight = Math.max(20, Math.min(30, h * 0.18));
+            const badgeWidth = Math.max(34, Math.min(52, w * 0.34));
+            const badgeX = sx - hw + badgeMargin;
+            const badgeY = sy - hh + badgeMargin;
+            const fontSize = Math.max(12, Math.min(18, h * 0.17));
+            const badgeRadius = Math.min(8, badgeHeight * 0.35);
+
+            ctx.filter = 'none';
+            ctx.globalAlpha = 1;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.26)';
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            ctx.beginPath();
+            ctx.moveTo(badgeX + badgeRadius, badgeY);
+            ctx.lineTo(badgeX + badgeWidth - badgeRadius, badgeY);
+            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY, badgeX + badgeWidth, badgeY + badgeRadius);
+            ctx.lineTo(badgeX + badgeWidth, badgeY + badgeHeight - badgeRadius);
+            ctx.quadraticCurveTo(badgeX + badgeWidth, badgeY + badgeHeight, badgeX + badgeWidth - badgeRadius, badgeY + badgeHeight);
+            ctx.lineTo(badgeX + badgeRadius, badgeY + badgeHeight);
+            ctx.quadraticCurveTo(badgeX, badgeY + badgeHeight, badgeX, badgeY + badgeHeight - badgeRadius);
+            ctx.lineTo(badgeX, badgeY + badgeRadius);
+            ctx.quadraticCurveTo(badgeX, badgeY, badgeX + badgeRadius, badgeY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+            ctx.font = `700 ${fontSize}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`#${media.label || '00'}`, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.5);
+            ctx.restore();
+            ctx.restore();
+        }
+
+        function projectLayer(sectionIndex, spinRad, phaseOffset, layerAlpha) {
+            const cosS = Math.cos(spinRad + phaseOffset);
+            const sinS = Math.sin(spinRad + phaseOffset);
+            const R = Math.min(W, H) * WORLD_RADIUS;
+
+            return particles.map((p) => {
+                const rx = p.x * cosS - p.z * sinS;
+                const ry = p.y;
+                const rz = p.x * sinS + p.z * cosS;
+                const fy = ry * cosT - rz * sinT;
+                const fz = ry * sinT + rz * cosT;
+
+                const rawSx = cx + rx * R * HORIZONTAL_SPREAD * p.orbitX;
+                const rawSy = cy + fy * R * p.orbitY;
+                const depth = (fz + 1) / 2;
+
+                const sizeF = (0.38 + depth * 0.95) * CARD_SIZE_BOOST;
+                const w = p.baseW * sizeF;
+                const h = p.baseH * sizeF;
+                const safeMargin = 14;
+                const sx = clamp(rawSx, safeMargin + w / 2, W - safeMargin - w / 2);
+                const sy = clamp(rawSy, safeMargin + h / 2, H - safeMargin - h / 2);
+
+                const nt = smoothstep(depth);
+                const visibility = MIN_CARD_VISIBILITY + (MAX_CARD_VISIBILITY - MIN_CARD_VISIBILITY) * nt;
+                const opacity = visibility * MAX_OPACITY;
+                const blur = (1 - nt) * 1.3;
+
+                return {
+                    sx,
+                    sy,
+                    w,
+                    h,
+                    depth,
+                    opacity: opacity * layerAlpha,
+                    blur,
+                    media: sectionMedia[sectionIndex][p.slot],
+                };
+            });
+        }
+
+        function drawCenterTitle(currentIndex, nextIndex, mix) {
+            const titleCurrent = SECTION_TITLES[currentIndex];
+            const titleNext = SECTION_TITLES[nextIndex];
+
+            const size = Math.max(34, Math.min(W * 0.075, 78));
+            const font = `600 ${size}px Georgia, "Times New Roman", serif`;
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#121212';
+            ctx.shadowColor = 'rgba(0,0,0,0.12)';
+            ctx.shadowBlur = 18;
+            ctx.font = font;
+
+            const outAlpha = nextIndex === currentIndex ? 1 : (1 - mix);
+            if (outAlpha > 0.01) {
+                ctx.globalAlpha = outAlpha;
+                ctx.filter = `blur(${(mix * 6).toFixed(2)}px)`;
+                ctx.fillText(titleCurrent, cx, cy);
+            }
+
+            if (nextIndex !== currentIndex && mix > 0.01) {
+                ctx.globalAlpha = mix;
+                ctx.filter = `blur(${((1 - mix) * 6).toFixed(2)}px)`;
+                ctx.fillText(titleNext, cx, cy);
+            }
+
+            ctx.restore();
+        }
+
+        function onScroll() {
+            updateScrollProgress();
+        }
+
+        let lastTime = performance.now();
+        function frame(now) {
+            const dt = Math.min(now - lastTime, 50);
+            lastTime = now;
+
+            const progressLf = 1 - Math.pow(PROGRESS_LERP_BASE, dt / 16.67);
+            renderProgress += (scrollProgress - renderProgress) * progressLf;
+            targetSpin = renderProgress * Math.PI * 2 * TOTAL_TURNS;
+
+            const spinLf = 1 - Math.pow(SPIN_LERP_BASE, dt / 16.67);
+            currentSpin += (targetSpin - currentSpin) * spinLf;
+
+            const sectionFloat = renderProgress * (SECTION_TITLES.length - 1);
+            const currentIndex = Math.floor(sectionFloat);
+            const nextIndex = Math.min(currentIndex + 1, SECTION_TITLES.length - 1);
+            const mix = smoothstep(sectionFloat - currentIndex);
+            const outLayer = 1 - mix;
+            const inLayer = mix;
+
+            const cardsCurrent = projectLayer(currentIndex, currentSpin, sectionPhase(currentIndex), outLayer);
+            const cardsNext = nextIndex === currentIndex
+                ? []
+                : projectLayer(nextIndex, currentSpin, sectionPhase(nextIndex), inLayer);
+
+            const allCards = cardsCurrent.concat(cardsNext).sort((a, b) => a.depth - b.depth);
+
+            ctx.clearRect(0, 0, W, H);
+
+            allCards
+                .filter((card) => card.depth < CENTER_DEPTH)
+                .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
+
+            drawCenterTitle(currentIndex, nextIndex, mix);
+
+            allCards
+                .filter((card) => card.depth >= CENTER_DEPTH)
+                .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
+
+            requestAnimationFrame(frame);
+        }
+
+        resize();
+        updateScrollProgress();
+        renderProgress = scrollProgress;
+        targetSpin = renderProgress * Math.PI * 2 * TOTAL_TURNS;
+        currentSpin = targetSpin;
+        scrollSnap.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', () => {
+            resize();
+            updateScrollProgress();
+        });
+        scrollSnap.scrollTo({ top: 0, behavior: 'auto' });
+        requestAnimationFrame(frame);
+    </script>
+</body>
+
+</html>
