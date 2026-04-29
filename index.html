@@ -171,12 +171,6 @@
         let targetSpin = 0;
         let currentSpin = 0;
         let activeMenuIndex = -1;
-        let pointerX = -1;
-        let pointerY = -1;
-        let pointerInside = false;
-        let wordmarkHoverCard = null;
-        let wordmarkAnchorCard = null;
-        let wordmarkSlide = 0;
 
         const BASE_IMAGE_PATHS = [
             "Assets/cosstores_1764409846_3776465965115332144_392125511 1.png",
@@ -196,15 +190,18 @@
         ];
         const LOGO_SECTION_IMAGE_PATHS = [
             "Assets/Group 409.png",
-            "Assets/Frame 2090055600.png",
-            "Assets/Frame 2090055602.png",
         ];
         const CENTER_LOGO_IMAGE_PATH = "Assets/Loem calligraphy signature.png";
-        const WORDMARK_HOVER_IMAGE_PATH = "Assets/original_0995e3cd9f020f9c3ddb2664d94c8ce0 3.png";
-        const WORDMARK_HOVER_SECTION_INDEX = 2;
-        const WORDMARK_SLIDE_LERP_BASE = 0.93;
-        const WORDMARK_TITLE = "WORDMARK";
-        const WORDMARK_BODY = "Placeholder type intro Dark Green + Warm, rich and natural supporting tones. Reflects the essential expressions of life energy.";
+        const CENTER_STEPS = [
+            { type: 'text', text: "A modern living practice" },
+            { type: 'text', text: "redefining daily essentials to elevate flow." },
+            { type: 'text', text: "Effortless presence," },
+            { type: 'text', text: "Clear mind," },
+            { type: 'text', text: "No friction." },
+            { type: 'text', text: "Just energy in motion." },
+            { type: 'image', imagePath: CENTER_LOGO_IMAGE_PATH },
+        ];
+        const CENTER_SLIDE_DISTANCE_RATIO = 0.36;
 
         const CARDS_PER_SECTION = 6;
         const SECTION_COUNT = SECTION_TITLES.length;
@@ -217,9 +214,9 @@
         const MAX_CARD_VISIBILITY = 0.98;
         const PROGRESS_LERP_BASE = 0.86;
         const SPIN_LERP_BASE = 0.88;
-        const WORLD_RADIUS = 0.45;
-        const HORIZONTAL_SPREAD = 1.24;
-        const CARD_SIZE_BOOST = 1.36;
+        const WORLD_RADIUS = 0.57;
+        const HORIZONTAL_SPREAD = 1.38;
+        const CARD_SIZE_BOOST = 1.68;
         const CORNER_BOOST_X_STRONG = 1.28;
         const CORNER_BOOST_Y_STRONG = 1.18;
         const CORNER_BOOST_X_SOFT = 1.14;
@@ -282,14 +279,14 @@
         const baseAssets = BASE_IMAGE_PATHS.map((path) => createImageAsset(path));
         const logoSectionAssets = LOGO_SECTION_IMAGE_PATHS.map((path) => createImageAsset(path));
         const centerLogoAsset = createImageAsset(CENTER_LOGO_IMAGE_PATH);
-        const logosSectionIndex = SECTION_TITLES.findIndex((title) => title.toLowerCase() === 'logos');
+        const logosSectionIndex = 1;
 
         const particles = Array.from({ length: CARDS_PER_SECTION }, (_, i) => {
             // Use midpoint sampling so first/last cards are not stuck on the poles.
             const y = 1 - ((i + 0.5) / CARDS_PER_SECTION) * 2;
             const r = Math.sqrt(Math.max(0, 1 - y * y));
             const theta = PHI * i;
-            const baseW = 122 + (i % 4) * 14;
+            const baseW = 148 + (i % 4) * 16;
             const baseH = baseW * (1.25 + (i % 3) * 0.08);
             const edgeSeed = (i * 17 + 11) % 12;
             let orbitX = 1;
@@ -342,9 +339,7 @@
                 logoSectionAssets.forEach((asset, index) => {
                     if (index >= media.length) return;
                     const logoLayout = [
-                        { scale: 2.2, layerBoost: 0.28 },
-                        { scale: 1.98, layerBoost: 0.36, shiftYRatio: -0.14, forceFront: true, forceOpacity: 1 },
-                        { scale: 1.98, layerBoost: 0.36, shiftXRatio: 0.17, forceFront: true, forceOpacity: 1 },
+                        { scale: 2.25, layerBoost: 0.3, forceFront: true, forceOpacity: 1 },
                     ][index] || { scale: 1.8, layerBoost: 0.22 };
                     media[index] = {
                         ...media[index],
@@ -361,13 +356,21 @@
                         disableBlur: true,
                     };
                 });
+                if (media[3]) {
+                    media[3] = {
+                        ...media[3],
+                        shiftXPx: -600,
+                    };
+                }
             }
 
-            if (sectionIndex === WORDMARK_HOVER_SECTION_INDEX) {
-                const wordmarkCard = media.find((item) => item.assetPath === WORDMARK_HOVER_IMAGE_PATH);
-                if (wordmarkCard) {
-                    wordmarkCard.forceFront = true;
-                    wordmarkCard.layerBoost = Math.max(wordmarkCard.layerBoost || 0, 0.32);
+            if (sectionIndex === 4) {
+                const target = media.find((item) => item.assetPath === "Assets/original_b44b8abee530c4056f8962ba2e53b164 5.png");
+                if (target) {
+                    target.shiftXRatio = 0.42;
+                    target.shiftYRatio = -0.46;
+                    target.forceFront = true;
+                    target.layerBoost = Math.max(target.layerBoost || 0, 0.3);
                 }
             }
 
@@ -472,15 +475,14 @@
                 const rawSy = cy + fy * R * p.orbitY;
                 const depth = (fz + 1) / 2;
                 const media = sectionMedia[sectionIndex][p.slot];
-                const shiftX = (media.shiftXRatio || 0) * W;
+                const shiftX = ((media.shiftXRatio || 0) * W) + (media.shiftXPx || 0);
                 const shiftY = (media.shiftYRatio || 0) * H;
                 const mediaScale = media.scale || 1;
                 const sizeF = (0.38 + depth * 0.95) * CARD_SIZE_BOOST;
                 const w = p.baseW * sizeF * mediaScale;
                 const h = p.baseH * sizeF * mediaScale;
-                const safeMargin = 14;
-                const sx = clamp(rawSx + shiftX, safeMargin + w / 2, W - safeMargin - w / 2);
-                const sy = clamp(rawSy + shiftY, safeMargin + h / 2, H - safeMargin - h / 2);
+                const sx = rawSx + shiftX;
+                const sy = rawSy + shiftY;
 
                 const boostedDepth = clamp(depth + (media.layerBoost || 0), 0, 1);
                 const renderDepth = media.forceFront ? 2 + boostedDepth : boostedDepth;
@@ -503,131 +505,81 @@
             });
         }
 
-        function drawCenterLogo() {
-            const img = centerLogoAsset;
-            const loaded = img && img.complete && img.naturalWidth > 0;
-            if (!loaded) return;
-
-            const targetW = clamp(W * 0.46, 180, 520);
-            const targetH = clamp(H * 0.2, 72, 200);
-            const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
-            const drawW = img.naturalWidth * scale;
-            const drawH = img.naturalHeight * scale;
-
-            ctx.save();
-            ctx.globalAlpha = 0.98;
-            ctx.shadowColor = 'rgba(0,0,0,0.12)';
-            ctx.shadowBlur = 10;
-            ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
-            ctx.restore();
-        }
-
         function onScroll() {
             updateScrollProgress();
         }
 
-        function drawWrappedText(text, x, y, maxWidth, lineHeight) {
+        function buildCenteredLines(text, maxWidth) {
             const words = text.split(/\s+/);
             let line = '';
-            let drawY = y;
+            const lines = [];
             for (let i = 0; i < words.length; i += 1) {
                 const testLine = line ? `${line} ${words[i]}` : words[i];
                 if (ctx.measureText(testLine).width > maxWidth && line) {
-                    ctx.fillText(line, x, drawY);
-                    drawY += lineHeight;
+                    lines.push(line);
                     line = words[i];
                 } else {
                     line = testLine;
                 }
             }
             if (line) {
-                ctx.fillText(line, x, drawY);
+                lines.push(line);
             }
+            return lines;
         }
 
-        function updateWordmarkHoverTarget(allCards, sectionFloat) {
-            const sectionIndex = clamp(Math.round(sectionFloat), 0, SECTION_TITLES.length - 1);
-            if (!pointerInside || sectionIndex !== WORDMARK_HOVER_SECTION_INDEX) {
-                wordmarkHoverCard = null;
+        function drawCenterStep(step, centerX, alpha) {
+            if (!step || alpha < 0.01) return;
+            ctx.save();
+            ctx.globalAlpha = clamp(alpha, 0, 1);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(17, 17, 17, 0.98)';
+            ctx.shadowColor = 'rgba(0,0,0,0.08)';
+            ctx.shadowBlur = 8;
+
+            if (step.type === 'image') {
+                const img = centerLogoAsset;
+                const loaded = img && img.complete && img.naturalWidth > 0;
+                if (loaded) {
+                    const targetW = clamp(W * 0.5, 220, 620);
+                    const targetH = clamp(H * 0.24, 90, 240);
+                    const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
+                    const drawW = img.naturalWidth * scale;
+                    const drawH = img.naturalHeight * scale;
+                    ctx.drawImage(img, centerX - drawW / 2, cy - drawH / 2, drawW, drawH);
+                }
+                ctx.restore();
                 return;
             }
 
-            let hoveredCard = null;
-            for (let i = allCards.length - 1; i >= 0; i -= 1) {
-                const card = allCards[i];
-                if (card.opacity < 0.04) continue;
-                const halfW = card.w / 2;
-                const halfH = card.h / 2;
-                if (
-                    pointerX >= card.sx - halfW &&
-                    pointerX <= card.sx + halfW &&
-                    pointerY >= card.sy - halfH &&
-                    pointerY <= card.sy + halfH
-                ) {
-                    hoveredCard = card;
-                    break;
-                }
-            }
-
-            wordmarkHoverCard = hoveredCard && hoveredCard.media.assetPath === WORDMARK_HOVER_IMAGE_PATH
-                ? hoveredCard
-                : null;
-        }
-
-        function drawWordmarkSlideOut() {
-            if (!wordmarkAnchorCard || wordmarkSlide < 0.001) return;
-
-            const card = wordmarkAnchorCard;
-            const edgeX = card.sx + card.w / 2 - 8;
-            const titleSize = clamp(W * 0.018, 14, 19);
-            const bodySize = clamp(W * 0.017, 14, 22);
-            const lineHeight = Math.round(bodySize * 1.2);
-            const blockWidth = clamp(W * 0.32, 220, 390);
-            const cardTop = card.sy - card.h / 2;
-            const titleY = clamp(cardTop + 2, 10, H - 180);
-            const bodyY = titleY + titleSize + 8;
-            // Start far behind the image, then slide out completely to the right.
-            const textGap = 34;
-            const hiddenOffsetX = blockWidth + textGap + 48;
-            const textX = edgeX + textGap - ((1 - wordmarkSlide) * hiddenOffsetX);
-            const clipY = titleY - 4;
-            const clipHeight = clamp(H * 0.42, 180, 320);
-
-            ctx.save();
-            // Mask anchored to the right edge of the image:
-            // nothing can be visible on the left side of the image.
-            ctx.beginPath();
-            ctx.rect(edgeX, clipY, blockWidth + 24, clipHeight);
-            ctx.clip();
-            ctx.globalAlpha = 1;
-
-            ctx.fillStyle = 'rgba(17, 17, 17, 0.98)';
-            ctx.font = `700 ${titleSize}px "Helvetica Neue", Arial, sans-serif`;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(WORDMARK_TITLE, textX, titleY);
-
-            ctx.fillStyle = 'rgba(21, 21, 21, 0.95)';
-            ctx.font = `500 ${bodySize}px Georgia, "Times New Roman", serif`;
-            drawWrappedText(WORDMARK_BODY, textX, bodyY, blockWidth - 12, lineHeight);
+            const text = (step.text || '').trim();
+            const fontSize = clamp(W * 0.0213, 16, 38);
+            const lineHeight = Math.round(fontSize * 1.1);
+            const maxWidth = clamp(W * 0.72, 320, 1060);
+            ctx.font = `500 ${fontSize}px Georgia, "Times New Roman", serif`;
+            const lines = buildCenteredLines(text, maxWidth);
+            const startY = cy - ((lines.length - 1) * lineHeight) / 2;
+            lines.forEach((line, idx) => {
+                ctx.fillText(line, centerX, startY + idx * lineHeight);
+            });
             ctx.restore();
         }
 
-        scrollSnap.addEventListener('pointermove', (event) => {
-            pointerInside = true;
-            pointerX = event.clientX;
-            pointerY = event.clientY;
-        });
+        function drawCenterTransition(currentIndex, nextIndex, mix) {
+            const currentStep = CENTER_STEPS[currentIndex];
+            const nextStep = CENTER_STEPS[nextIndex];
+            const slideDistance = clamp(W * CENTER_SLIDE_DISTANCE_RATIO, 180, 460);
+            const inShift = slideDistance * (1 - mix);
+            const outShift = slideDistance * mix;
+            const currentX = cx - outShift;
+            const nextX = cx + inShift;
 
-        scrollSnap.addEventListener('pointerleave', () => {
-            pointerInside = false;
-            wordmarkHoverCard = null;
-        });
-
-        scrollSnap.addEventListener('touchstart', () => {
-            pointerInside = false;
-            wordmarkHoverCard = null;
-        }, { passive: true });
+            drawCenterStep(currentStep, currentX, 1 - mix);
+            if (nextIndex !== currentIndex) {
+                drawCenterStep(nextStep, nextX, mix);
+            }
+        }
 
         sectionMenuItems.forEach((item) => {
             item.addEventListener('click', () => {
@@ -663,16 +615,6 @@
                 : projectLayer(nextIndex, currentSpin, sectionPhase(nextIndex), inLayer);
 
             const allCards = cardsCurrent.concat(cardsNext).sort((a, b) => a.depth - b.depth);
-            updateWordmarkHoverTarget(allCards, sectionFloat);
-
-            const wordmarkLf = 1 - Math.pow(WORDMARK_SLIDE_LERP_BASE, dt / 16.67);
-            const wordmarkTarget = wordmarkHoverCard ? 1 : 0;
-            wordmarkSlide += (wordmarkTarget - wordmarkSlide) * wordmarkLf;
-            if (wordmarkHoverCard) {
-                wordmarkAnchorCard = wordmarkHoverCard;
-            } else if (wordmarkSlide < 0.01) {
-                wordmarkAnchorCard = null;
-            }
 
             ctx.clearRect(0, 0, W, H);
 
@@ -680,8 +622,7 @@
                 .filter((card) => card.depth < CENTER_DEPTH)
                 .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
 
-            drawCenterLogo();
-            drawWordmarkSlideOut();
+            drawCenterTransition(currentIndex, nextIndex, mix);
 
             allCards
                 .filter((card) => card.depth >= CENTER_DEPTH)
