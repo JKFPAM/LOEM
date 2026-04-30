@@ -407,6 +407,9 @@
     .animate-lines .line-1 { --target-x: -24px; transition-delay: 60ms; }
     .animate-lines .line-2 { --target-x: 16px; transition-delay: 150ms; }
     .animate-lines .line-3 { --target-x: -18px; transition-delay: 240ms; }
+    .animate-lines.is-visible .line-1 { transition-delay: 60ms; }
+    .animate-lines.is-visible .line-2 { transition-delay: 180ms; }
+    .animate-lines.is-visible .line-3 { transition-delay: 300ms; }
 
     .philo-copy .animate-lines .line-1 { --target-x: -26px; transition-delay: 80ms; }
     .philo-copy .animate-lines .line-2 { --target-x: 18px; transition-delay: 160ms; }
@@ -414,11 +417,21 @@
     .philo-copy .animate-lines .line-4 { --target-x: 24px; transition-delay: 320ms; }
     .philo-copy .animate-lines .line-5 { --target-x: -22px; transition-delay: 400ms; }
     .philo-copy .animate-lines .line-6 { --target-x: 12px; transition-delay: 480ms; }
+    .philo-copy .animate-lines.is-visible .line-1 { transition-delay: 80ms; }
+    .philo-copy .animate-lines.is-visible .line-2 { transition-delay: 180ms; }
+    .philo-copy .animate-lines.is-visible .line-3 { transition-delay: 280ms; }
+    .philo-copy .animate-lines.is-visible .line-4 { transition-delay: 380ms; }
+    .philo-copy .animate-lines.is-visible .line-5 { transition-delay: 480ms; }
+    .philo-copy .animate-lines.is-visible .line-6 { transition-delay: 580ms; }
 
     .mission .animate-lines .line-1 { --target-x: -96px; transition-delay: 80ms; }
     .mission .animate-lines .line-2 { --target-x: -38px; transition-delay: 160ms; }
     .mission .animate-lines .line-3 { --target-x: 52px; transition-delay: 240ms; }
     .mission .animate-lines .line-4 { --target-x: 8px; transition-delay: 320ms; }
+    .mission .animate-lines.is-visible .line-1 { transition-delay: 80ms; }
+    .mission .animate-lines.is-visible .line-2 { transition-delay: 180ms; }
+    .mission .animate-lines.is-visible .line-3 { transition-delay: 280ms; }
+    .mission .animate-lines.is-visible .line-4 { transition-delay: 380ms; }
     body.text-ready .mission .mission-body span {
       opacity: 1;
       --line-reveal-x: 0px;
@@ -609,6 +622,7 @@
       requestAnimationFrame(updateParallax);
 
       const animatedBlocks = Array.from(document.querySelectorAll('.animate-lines'));
+      const heroLines = document.querySelector('.hero .animate-lines');
       const revealIfVisible = () => {
         const vh = window.innerHeight || 1;
         animatedBlocks.forEach((block) => {
@@ -627,13 +641,32 @@
 
       // Ensure first-screen text animates on initial load.
       animatedBlocks.forEach((block) => block.classList.remove('is-visible'));
+      const replayHeroIntro = () => {
+        if (!heroLines) return;
+        heroLines.classList.remove('is-visible');
+        // Force style flush so transition reliably restarts.
+        void heroLines.offsetWidth;
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              heroLines.classList.add('is-visible');
+            });
+          });
+        }, 220);
+      };
+
       window.addEventListener('load', () => {
+        replayHeroIntro();
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             revealIfVisible();
           });
         });
       }, { once: true });
+      window.addEventListener('pageshow', () => {
+        replayHeroIntro();
+        revealIfVisible();
+      });
       window.addEventListener('resize', revealIfVisible, { passive: true });
       window.addEventListener('scroll', revealIfVisible, { passive: true });
     });
