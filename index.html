@@ -36,6 +36,17 @@
         body {
             background: #FFFAF3;
             overflow: hidden;
+            cursor: none;
+            opacity: 0;
+            transition: opacity 620ms ease;
+        }
+
+        body.page-in {
+            opacity: 1;
+        }
+
+        body.page-out {
+            opacity: 0;
         }
 
         canvas {
@@ -44,6 +55,27 @@
             display: block;
             pointer-events: none;
             z-index: 0;
+        }
+
+        .light-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 5;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(253, 188, 5, 0.26) 0%, rgba(2, 67, 250, 0) 100%);
+            mix-blend-mode: normal;
+            filter: blur(9.5px);
+            opacity: 0;
+            transition: opacity 220ms ease;
+        }
+
+        .light-cursor.is-visible {
+            opacity: 1;
         }
 
         .scroll-snap {
@@ -56,6 +88,12 @@
             scroll-behavior: smooth;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .scroll-snap::-webkit-scrollbar {
+            display: none;
         }
 
         .snap-section {
@@ -64,61 +102,6 @@
             scroll-snap-stop: always;
         }
 
-        .section-menu {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 3;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            padding: 10px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.54);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            backdrop-filter: blur(8px);
-        }
-
-        .section-menu__item {
-            display: inline-flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            border: 0;
-            background: transparent;
-            color: rgba(16, 16, 16, 0.7);
-            padding: 4px 6px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 180ms ease, color 180ms ease, transform 180ms ease;
-            font: 500 12px/1.2 "Helvetica Neue", Arial, sans-serif;
-            letter-spacing: 0.01em;
-        }
-
-        .section-menu__item:hover {
-            background: rgba(255, 255, 255, 0.66);
-            color: rgba(16, 16, 16, 0.92);
-        }
-
-        .section-menu__item.is-active {
-            background: rgba(255, 255, 255, 0.86);
-            color: rgba(0, 0, 0, 0.96);
-            transform: translateX(-2px);
-        }
-
-        .section-menu__dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.28);
-            transition: transform 180ms ease, background 180ms ease;
-            flex: 0 0 8px;
-        }
-
-        .section-menu__item.is-active .section-menu__dot {
-            background: rgba(0, 0, 0, 0.86);
-            transform: scale(1.2);
-        }
 
         .top-chrome {
             position: fixed;
@@ -172,11 +155,11 @@
             padding: 10px 14px;
             cursor: pointer;
             pointer-events: auto;
-            transition: background-color 220ms ease;
+            transition: color 180ms ease;
         }
 
         .top-chrome__btn:hover {
-            background: #F6E9D7;
+            color: #ff9d00;
         }
 
         .top-chrome__logo {
@@ -189,7 +172,7 @@
         .final-actions {
             position: fixed;
             left: 50%;
-            bottom: 60px;
+            top: 50%;
             transform: translate(-50%, 16px);
             z-index: 4;
             display: flex;
@@ -209,7 +192,7 @@
             min-width: 180px;
             height: 48px;
             border: 0;
-            background: #F6E9D7;
+            background: transparent;
             color: #151515;
             font-family: "Greed Condensed", "Helvetica Neue", Arial, sans-serif;
             font-size: 16px;
@@ -218,11 +201,12 @@
             letter-spacing: 0.02em;
             text-transform: uppercase;
             cursor: pointer;
-            transition: background-color 220ms ease;
+            transition: color 180ms ease;
         }
 
         .final-actions__btn:hover {
-            background: #FFF2E0;
+            color: #ff9d00;
+            
         }
 
         @media (max-width: 700px) {
@@ -241,20 +225,8 @@
                 width: clamp(55px, 17vw, 80px);
             }
 
-            .section-menu {
-                top: 12px;
-                right: 12px;
-                padding: 8px;
-                gap: 6px;
-            }
-
-            .section-menu__item {
-                font-size: 11px;
-            }
-
             .final-actions {
                 width: calc(100% - 24px);
-                bottom: 18px;
                 gap: 10px;
             }
 
@@ -270,10 +242,11 @@
 
 <body>
     <canvas id="c"></canvas>
-    <div id="topChrome" class="top-chrome" aria-hidden="false">
-        <div class="top-chrome__slot top-chrome__slot--left">
-            <button class="top-chrome__btn" type="button">Brand Story</button>
-        </div>
+    <div id="lightCursor" class="light-cursor" aria-hidden="true"></div>
+        <div id="topChrome" class="top-chrome" aria-hidden="false">
+            <div class="top-chrome__slot top-chrome__slot--left">
+                <button id="brandStoryTopBtn" class="top-chrome__btn" type="button">Brand Story</button>
+            </div>
         <div class="top-chrome__slot top-chrome__slot--center">
             <img class="top-chrome__logo" src="Assets/Wordmark.svg" alt="Loem wordmark">
         </div>
@@ -281,9 +254,8 @@
             <button class="top-chrome__btn" type="button">Look Book</button>
         </div>
     </div>
-    <nav id="sectionMenu" class="section-menu" aria-label="Navigation des sections"></nav>
     <div id="finalActions" class="final-actions" aria-hidden="true">
-        <button class="final-actions__btn" type="button">Brand Story</button>
+        <button id="brandStoryFinalBtn" class="final-actions__btn" type="button">Brand Story</button>
         <button class="final-actions__btn" type="button">Brand in Action</button>
     </div>
     <div id="scrollSnap" class="scroll-snap" aria-hidden="true">
@@ -306,25 +278,25 @@
         ];
 
         const canvas = document.getElementById('c');
+        const lightCursor = document.getElementById('lightCursor');
         const scrollSnap = document.getElementById('scrollSnap');
         const topChrome = document.getElementById('topChrome');
-        const sectionMenu = document.getElementById('sectionMenu');
         const finalActions = document.getElementById('finalActions');
+        const brandStoryTopBtn = document.getElementById('brandStoryTopBtn');
+        const brandStoryFinalBtn = document.getElementById('brandStoryFinalBtn');
         const ctx = canvas.getContext('2d');
+
+        function navigateWithDissolve(href) {
+            document.body.classList.add('page-out');
+            setTimeout(() => {
+                window.location.href = href;
+            }, 520);
+        }
 
         // Keep section count in sync with titles.
         scrollSnap.innerHTML = SECTION_TITLES
             .map((title) => `<section class="snap-section" aria-label="${title}"></section>`)
             .join('');
-        sectionMenu.innerHTML = SECTION_TITLES
-            .map((title, index) => `
-                <button class="section-menu__item" type="button" data-section-index="${index}" aria-current="false" aria-label="${title}" title="${title}">
-                    <span class="section-menu__label">${index + 1}</span>
-                    <span class="section-menu__dot" aria-hidden="true"></span>
-                </button>
-            `)
-            .join('');
-        const sectionMenuItems = Array.from(sectionMenu.querySelectorAll('.section-menu__item'));
 
         let W = 0;
         let H = 0;
@@ -332,9 +304,10 @@
         let cy = 0;
         let scrollProgress = 0;
         let renderProgress = 0;
+        let bgProgress = 0;
         let targetSpin = 0;
         let currentSpin = 0;
-        let activeMenuIndex = -1;
+        let idleTime = 0;
 
         const BASE_IMAGE_PATHS = [
             "Assets/cosstores_1764409846_3776465965115332144_392125511 1.png",
@@ -362,6 +335,19 @@
             { type: 'image', imagePath: CENTER_LOGO_IMAGE_PATH },
         ];
         const CENTER_SLIDE_DISTANCE_RATIO = 0.36;
+        const BG_PALETTE = {
+            blue: '#B4BCFF',
+            yellow: '#FDBC05',
+            offWhite: '#FFFAF3',
+        };
+        const BG_STEPS = [
+            { accent: BG_PALETTE.yellow, alpha: 0.00, pos: 18 },
+            { accent: BG_PALETTE.yellow, alpha: 0.18, pos: 28 },
+            { accent: BG_PALETTE.blue, alpha: 0.24, pos: 42 },
+            { accent: BG_PALETTE.blue, alpha: 0.20, pos: 58 },
+            { accent: BG_PALETTE.yellow, alpha: 0.12, pos: 74 },
+            { accent: BG_PALETTE.offWhite, alpha: 0.00, pos: 82 },
+        ];
 
         const CARDS_PER_SECTION = 10;
         const SECTION_COUNT = SECTION_TITLES.length;
@@ -373,6 +359,7 @@
         const MIN_CARD_VISIBILITY = 0.54;
         const MAX_CARD_VISIBILITY = 0.98;
         const PROGRESS_LERP_BASE = 0.86;
+        const BG_PROGRESS_LERP_BASE = 0.97;
         const SPIN_LERP_BASE = 0.88;
         const WORLD_RADIUS = 0.57;
         const HORIZONTAL_SPREAD = 1.9;
@@ -392,6 +379,49 @@
 
         function clamp(v, min, max) {
             return Math.max(min, Math.min(max, v));
+        }
+
+        function hexToRgb(hex) {
+            const value = hex.replace('#', '').trim();
+            const normalized = value.length === 3
+                ? value.split('').map((ch) => ch + ch).join('')
+                : value;
+            const intVal = Number.parseInt(normalized, 16);
+            return {
+                r: (intVal >> 16) & 255,
+                g: (intVal >> 8) & 255,
+                b: intVal & 255,
+            };
+        }
+
+        function mixColor(aHex, bHex, t) {
+            const a = hexToRgb(aHex);
+            const b = hexToRgb(bHex);
+            return {
+                r: Math.round(a.r + (b.r - a.r) * t),
+                g: Math.round(a.g + (b.g - a.g) * t),
+                b: Math.round(a.b + (b.b - a.b) * t),
+            };
+        }
+
+        function toRgba(color, alpha) {
+            return `rgba(${color.r}, ${color.g}, ${color.b}, ${clamp(alpha, 0, 1).toFixed(3)})`;
+        }
+
+        function updateDynamicBackground(sectionFloat) {
+            const fromIndex = clamp(Math.floor(sectionFloat), 0, BG_STEPS.length - 1);
+            const toIndex = Math.min(fromIndex + 1, BG_STEPS.length - 1);
+            const t = smoothstep(sectionFloat - fromIndex);
+            const from = BG_STEPS[fromIndex];
+            const to = BG_STEPS[toIndex];
+
+            const base = hexToRgb(BG_PALETTE.offWhite);
+            const accent = mixColor(from.accent, to.accent, t);
+            const alpha = from.alpha + (to.alpha - from.alpha) * t;
+            const pos = from.pos + (to.pos - from.pos) * t;
+            const tailPos = clamp(pos + 22, 0, 100);
+
+            document.body.style.background = `linear-gradient(90deg, ${toRgba(base, 1)} 0%, ${toRgba(accent, alpha)} ${pos.toFixed(2)}%, ${toRgba(accent, alpha * 0.35)} ${tailPos.toFixed(2)}%, ${toRgba(base, 1)} 100%)`;
         }
 
         function resize() {
@@ -416,23 +446,18 @@
             return index * PHASE_PER_SECTION;
         }
 
-        function updateSectionMenu(sectionFloat) {
-            const nextActive = clamp(Math.round(sectionFloat), 0, SECTION_TITLES.length - 1);
-            if (nextActive === activeMenuIndex) return;
-            activeMenuIndex = nextActive;
-
-            sectionMenuItems.forEach((item, index) => {
-                const isActive = index === activeMenuIndex;
-                item.classList.toggle('is-active', isActive);
-                item.setAttribute('aria-current', isActive ? 'true' : 'false');
-            });
-        }
-
         function updateFinalActions(sectionFloat) {
             const threshold = SECTION_TITLES.length - 1.05;
             const isVisible = sectionFloat >= threshold;
             finalActions.classList.toggle('is-visible', isVisible);
             finalActions.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+        }
+
+        function updateFinalActionsPosition() {
+            // Keep CTA row anchored right under the final center logo.
+            const targetH = clamp(H * 0.144, 54, 144);
+            const y = cy + targetH / 2 + clamp(H * 0.055, 26, 56);
+            finalActions.style.top = `${Math.round(y)}px`;
         }
 
         function updateTopChrome(sectionFloat) {
@@ -647,7 +672,7 @@
             ctx.restore();
         }
 
-        function projectLayer(sectionIndex, spinRad, phaseOffset, layerAlpha) {
+        function projectLayer(sectionIndex, spinRad, phaseOffset, layerAlpha, idleAmount) {
             const cosS = Math.cos(spinRad + phaseOffset);
             const sinS = Math.sin(spinRad + phaseOffset);
             const R = Math.min(W, H) * WORLD_RADIUS;
@@ -669,8 +694,11 @@
                 const sizeF = (0.38 + depth * 0.95) * CARD_SIZE_BOOST;
                 const w = p.baseW * sizeF * mediaScale;
                 const h = p.baseH * sizeF * mediaScale;
-                const sx = rawSx + shiftX;
-                const sy = rawSy + shiftY;
+                const slotSeed = p.slot * 0.91 + 0.37;
+                const idleWaveX = Math.sin(idleTime * 0.55 + slotSeed) * clamp(W * 0.0038, 2.5, 8) * idleAmount;
+                const idleWaveY = Math.cos(idleTime * 0.62 + slotSeed * 1.3) * clamp(H * 0.0042, 2.5, 8) * idleAmount;
+                const sx = rawSx + shiftX + idleWaveX;
+                const sy = rawSy + shiftY + idleWaveY;
 
                 const boostedDepth = clamp(depth + (media.layerBoost || 0), 0, 1);
                 const renderDepth = media.forceFront ? 2 + boostedDepth : boostedDepth;
@@ -696,6 +724,32 @@
         function onScroll() {
             updateScrollProgress();
         }
+
+        function updateLightCursorPosition(clientX, clientY) {
+            lightCursor.style.left = `${clientX}px`;
+            lightCursor.style.top = `${clientY}px`;
+        }
+
+        window.addEventListener('mousemove', (event) => {
+            updateLightCursorPosition(event.clientX, event.clientY);
+            lightCursor.classList.add('is-visible');
+        }, { passive: true });
+
+        window.addEventListener('mouseenter', (event) => {
+            updateLightCursorPosition(event.clientX, event.clientY);
+            lightCursor.classList.add('is-visible');
+        }, { passive: true });
+
+        window.addEventListener('mouseleave', () => {
+            lightCursor.classList.remove('is-visible');
+        }, { passive: true });
+
+        brandStoryTopBtn?.addEventListener('click', () => {
+            navigateWithDissolve('/brand-story.html');
+        });
+        brandStoryFinalBtn?.addEventListener('click', () => {
+            navigateWithDissolve('/brand-story.html');
+        });
 
         function buildCenteredLines(text, maxWidth) {
             const words = text.split(/\s+/);
@@ -794,13 +848,28 @@
             ctx.restore();
         }
 
-        sectionMenuItems.forEach((item) => {
-            item.addEventListener('click', () => {
-                const sectionIndex = Number(item.dataset.sectionIndex || 0);
-                const sectionTarget = scrollSnap.clientHeight * sectionIndex;
-                scrollSnap.scrollTo({ top: sectionTarget, behavior: 'smooth' });
-            });
-        });
+        function getFinalCardsExitProgress(sectionFloat) {
+            const lastIndex = SECTION_TITLES.length - 1;
+            const start = lastIndex - 0.9;
+            const end = lastIndex;
+            const t = clamp((sectionFloat - start) / Math.max(0.001, end - start), 0, 1);
+            return smoothstep(t);
+        }
+
+        function applyFinalCardsExit(card, exitProgress) {
+            if (exitProgress <= 0.001) return card;
+            const dx = card.sx - cx;
+            const dy = card.sy - cy;
+            const outward = 0.06 + exitProgress * 0.1;
+            const upLift = clamp(H * 0.03, 16, 34) * exitProgress;
+            return {
+                ...card,
+                sx: card.sx + dx * outward * exitProgress,
+                sy: card.sy + dy * outward * exitProgress - upLift,
+                opacity: card.opacity * (1 - exitProgress),
+                blur: card.blur + exitProgress * 1.1,
+            };
+        }
 
         let lastTime = performance.now();
         function frame(now) {
@@ -809,38 +878,48 @@
 
             const progressLf = 1 - Math.pow(PROGRESS_LERP_BASE, dt / 16.67);
             renderProgress += (scrollProgress - renderProgress) * progressLf;
+            const bgLf = 1 - Math.pow(BG_PROGRESS_LERP_BASE, dt / 16.67);
+            bgProgress += (scrollProgress - bgProgress) * bgLf;
             targetSpin = renderProgress * Math.PI * 2 * TOTAL_TURNS;
+            const settleDelta = Math.abs(scrollProgress - renderProgress);
+            const isIdle = settleDelta < 0.0007;
+            idleTime = isIdle ? idleTime + dt * 0.001 : 0;
+            const idleAmount = isIdle ? smoothstep(clamp(idleTime / 0.8, 0, 1)) : 0;
 
             const spinLf = 1 - Math.pow(SPIN_LERP_BASE, dt / 16.67);
             currentSpin += (targetSpin - currentSpin) * spinLf;
 
             const sectionFloat = renderProgress * (SECTION_TITLES.length - 1);
+            const bgSectionFloat = bgProgress * (SECTION_TITLES.length - 1);
             const currentIndex = Math.floor(sectionFloat);
             const nextIndex = Math.min(currentIndex + 1, SECTION_TITLES.length - 1);
             const mix = smoothstep(sectionFloat - currentIndex);
-            updateSectionMenu(sectionFloat);
             updateFinalActions(sectionFloat);
+            updateFinalActionsPosition();
             updateTopChrome(sectionFloat);
+            updateDynamicBackground(bgSectionFloat);
             const phaseCurrent = sectionPhase(currentIndex);
             const phaseNext = sectionPhase(nextIndex);
             const blendedPhase = phaseCurrent + (phaseNext - phaseCurrent) * mix;
-            const allCards = projectLayer(0, currentSpin, blendedPhase, 1).sort((a, b) => a.depth - b.depth);
+            const allCards = projectLayer(0, currentSpin, blendedPhase, 1, idleAmount).sort((a, b) => a.depth - b.depth);
+            const finalCardsExit = getFinalCardsExitProgress(sectionFloat);
+            const visibleCards = allCards.map((card) => applyFinalCardsExit(card, finalCardsExit));
 
             ctx.clearRect(0, 0, W, H);
 
-            allCards
+            visibleCards
                 .filter((card) => card.depth < CENTER_DEPTH)
                 .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
 
             drawCenterTransition(currentIndex, nextIndex, mix);
             drawCenterStepper(sectionFloat);
 
-            allCards
+            visibleCards
                 .filter((card) => card.depth >= CENTER_DEPTH)
                 .forEach((card) => drawCard(card.media, card.sx, card.sy, card.w, card.h, card.opacity, card.blur));
 
             // Keep numbering always readable on top of everything.
-            allCards.forEach((card) => {
+            visibleCards.forEach((card) => {
                 drawBadgeOverlay(card.media, card.sx, card.sy, card.w, card.h, card.opacity);
             });
 
@@ -850,6 +929,7 @@
         resize();
         updateScrollProgress();
         renderProgress = scrollProgress;
+        bgProgress = scrollProgress;
         targetSpin = renderProgress * Math.PI * 2 * TOTAL_TURNS;
         currentSpin = targetSpin;
         scrollSnap.addEventListener('scroll', onScroll, { passive: true });
@@ -858,6 +938,7 @@
             updateScrollProgress();
         });
         scrollSnap.scrollTo({ top: 0, behavior: 'auto' });
+        requestAnimationFrame(() => document.body.classList.add('page-in'));
         requestAnimationFrame(frame);
     </script>
 </body>
