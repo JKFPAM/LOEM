@@ -613,37 +613,27 @@
         const vh = window.innerHeight || 1;
         animatedBlocks.forEach((block) => {
           const rect = block.getBoundingClientRect();
-          const visible = rect.top < vh * 0.86 && rect.bottom > vh * 0.18;
-          block.classList.toggle('is-visible', visible);
-        });
-      };
-      const replayVisibleAnimations = () => {
-        const vh = window.innerHeight || 1;
-        const visibleBlocks = animatedBlocks.filter((block) => {
-          const rect = block.getBoundingClientRect();
-          return rect.top < vh * 0.86 && rect.bottom > vh * 0.18;
-        });
-        visibleBlocks.forEach((block) => block.classList.remove('is-visible'));
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            visibleBlocks.forEach((block) => block.classList.add('is-visible'));
-          });
-        });
-      };
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-          } else {
-            entry.target.classList.remove('is-visible');
+          const isVisible = block.classList.contains('is-visible');
+          // Enter earlier, exit later (longer scroll distance before disappearing).
+          const enter = rect.top < vh * 0.9 && rect.bottom > vh * 0.15;
+          const keep = rect.top < vh * 1.05 && rect.bottom > -vh * 0.35;
+          if (!isVisible && enter) {
+            block.classList.add('is-visible');
+          } else if (isVisible && !keep) {
+            block.classList.remove('is-visible');
           }
         });
-      }, { threshold: 0.22, rootMargin: "0px 0px -10% 0px" });
-      animatedBlocks.forEach((block) => observer.observe(block));
+      };
 
       // Ensure first-screen text animates on initial load.
-      requestAnimationFrame(revealIfVisible);
-      window.addEventListener('load', replayVisibleAnimations, { once: true });
+      animatedBlocks.forEach((block) => block.classList.remove('is-visible'));
+      window.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            revealIfVisible();
+          });
+        });
+      }, { once: true });
       window.addEventListener('resize', revealIfVisible, { passive: true });
       window.addEventListener('scroll', revealIfVisible, { passive: true });
     });
